@@ -1,44 +1,142 @@
 <!--
 
-EdgeMAX Wizard "ER-wizard-0xFF-OpenVPN2TS" created 03/2018 by CPO for FunkFeuer.at
-Works on EdgeRouter and EdgeRouter X / X-SFP (system version 1.9.7+)
-versioninfo=201802141
+EdgeMAX Wizard "OLSRd_V2" created 03/2017 by CPO for FunkFeuer.at
+Works on EdgeRouter and EdgeRouter X / X-SFP (system version 1.9.0+)
+versioninfo=201802021
 ^-- use version identifier as number: YYYYMMDDX whereas X can be intraday-version
-autoupdate=201706200
+autoupdate=201802021
 ^-- set autoupdate the same version identifier to allow autoupdates
-
 
 -->
 <div class="instructions">
-    <h3>0xFF-OpenVPN2TS</h3>
+  EdgeMAX Wizard "OLSRd_V2"
 </div>
 <legend style="position:absolute;right:0px;padding:5px;">
-    <center>EdgeMAX Wizard "ER-wizard-0xFF-OpenVPN2TS"<br>created 03/2018 by CPO for FunkFeuer.at<br>
-    Version 20180127</center>
+    <center>EdgeMAX Wizard "OLSRd_V2"<br>created 03/2017 by CPO for FunkFeuer.at<br>
+    Version 20180202/pkg-0.8/oonf-0.14.1-16</center>
 </legend>
+
 <div style="padding:15px;border: 1px solid lightgray;width:648px">
   <table border="0">
-    <tr><td style="vertical-align:middle">Update Info:</td>   <td><input style="right:10px" id="updatestatus" name="updatestatus" type="text" size="60" disabled /></td></tr>
-    <tr><td colspan="2"><div><span><input id="updatefromgithub" name="updatefromgithub" type="checkbox" />&nbsp;</span></div><div><span class="text" data-infotip='Load and install newest version directly from Github'> Upgrade Wizard from GitHub (online only) on 'Apply'</span></div></td></tr>
-    <tr><td colspan="2"><div><span><input id="autoupdatefromgithub" name="autoupdatefromgithub" type="checkbox" />&nbsp;</span></div><div><span class="text" data-infotip='Runs a daily job checking for updates - installs available auto-updates automatically'> Upgrade Wizard from GitHub <b>automatically</b></span></div></td></tr>
+    <tr><td style="vertical-align:middle">OLSRd2 Status:</td><td><input style="right:10px" id="olsrd2status" name="olsrd2status" type="text" size="60" disabled /></td></tr>
+    <tr><td style="vertical-align:middle">Update Info:  </td><td><input style="right:10px" id="updatestatus" name="updatestatus" type="text" size="60" disabled />
+           <input id="updatefromgithub" name="updatefromgithub"  type="checkbox" /><span> Upgrade on 'Apply'!</span><br></td></tr>
   </table>
+  <br>
+  <input id="autoupdatefromgithub" name="autoupdatefromgithub" type="checkbox" /><span> Upgrade Wizard from GitHub <b>automatically</b></span><br>
+  <input id="autostart" name="autostart"  type="checkbox" /><span> Enable OLSRd2 daemon and Start-on-Boot </span><br>
+  <input id="olsrdrestart" name="olsrdrestartnow"  type="checkbox" /><span> Restart OLSRv2 daemon on 'Apply'</span><br>
+  <input id="reset2defaults" name="reset2defaults"  type="checkbox" /><span> Reset olsrd2.conf to default-settings on 'Apply'</span><br>
 </div>
-
 <br><br>
+
+<fieldset id="ipv6olsrd" name="ipv6olsrd" class="primary expanded">
+    <legend>OLSRd2 IPv6</legend>
+    <table border="0">
+      <tr><td style="vertical-align:middle">Firewall rules exist</td> <td><input id="firewallcreated" name="firewallcreated"  type="checkbox" disabled /> Firewall-Rules have been created<td></tr>
+      <tr><td style="vertical-align:middle">Initialize Firewall rules</td> <td><input id="initfirewall" name="initfirewall"  type="checkbox" /> Initialise or update firewall rules<td></tr>
+      <tr><td style="vertical-align:middle">Enable v6 Firewall </td> <td><input id="routerfirewall" name="routerfirewall"  type="checkbox" /> Block unwanted IPv6 traffic to router<td></tr>
+      <tr><td style="vertical-align:middle">Assign Google DNSv6 </td> <td><input id="googlednson" name="googlednson"  type="checkbox" /> User IPv6-DNS servers from Google as name-servers<td></tr>
+      <tr><td style="vertical-align:middle">lo-Adresse EUI64 </td> <td><input style="right:10px" id="eui4address" name="eui4address" type="text" size="40" disabled />
+               <input id="eui4addron" name="eui4addron"  type="checkbox" /><span> Assigned </span><td></tr>
+      <tr><td style="vertical-align:middle">lo-Adresse NodeID<br>change here </td><td><input style="right:10px" id="nodeidaddress" name="nodeidaddress" type="text" size="40" />
+               <input style="right:10px" id="currentnodeidaddress" name="currentnodeidaddress" type="hidden" size="40" />
+               <input id="nodeidaddron" name="nodeidaddron"  type="checkbox" /><span> Assigned </span><td></tr>
+      <tr><td style="vertical-align:middle">Node/Router/NIC-ID </td><td><input style="right:10px" id="nodeiddec" name="nodeiddec" type="text" size="10" disabled /><input style="right:10px" id="routeriddec" name="routeriddec" type="text" size="4" disabled /><input style="right:10px" id="niciddec" name="niciddec" type="text" size="2" disabled /></td></tr>
+      <tr><td style="vertical-align:middle">...hex...          </td><td><input style="right:10px" id="nodeidhex" name="nodeidhex" type="text" size="10" disabled /><input style="right:10px" id="routeridhex" name="routeridhex" type="text" size="4" disabled /><input style="right:10px" id="nicidhex" name="nicidhex" type="text" size="2" disabled /></td></tr>
+      <tr><td style="vertical-align:middle">4in6 IPv4 </td><td><input style="right:10px" id="tunnel4in6addrv4" name="tunnel4in6addrv4" type="text" size="20" /></td></tr>
+    </table>
+</fieldset>
+
+<fieldset id="ipv6ifs" name="ipv6ifs" class="primary expanded">
+    <legend>Interfaces</legend>
+    <div class="addable" data-min="1" data-max="1" data-object="olsr6config" data-objectify="1">
+        <table><tr>
+        <td width=122 align=right>MESH,FW</td>
+        <td width=230 align=center>IPv6-Address</td>
+        <td width=30>LAN</td>
+        <td width=160 align=center>Prefix</td>
+        <td>Firewall</td>
+        </tr></table>
+        <div class="addable-template" style="padding-top:0px;">
+            <div class="multi">
+                <div><input id="olsrinterface" name="olsrv6intf" size="6" disabled /></div>
+                <div><input name="enabled" type="checkbox" onclick="validate()" disabled /></div>
+                <div><input name="routerfw" type="checkbox" onclick="validate()" disabled /></div>
+                <div><input name="ipv6address" size="33" disabled /></div>
+                <div><input name="lanon" type="checkbox" onclick="validate()" /></div>
+                <div><input name="prefix" size="22" disabled /></div>
+                <div><input name="origprefix" type="hidden" size="20" disabled /></div>
+                <div><input name="firewallon" type="checkbox" onclick="validate()" /></div>
+            </div>
+        </div>
+        <div class="addable-container"></div>
+        <!-- although hidden, this add-button needs to exist! //-->
+        <button type="button" class="addable-add" style="position:absolute;right:0px;opacity:0.0;filter:alpha(opacity=0);" disabled></button>
+    </div>
+</fieldset>
+
+<fieldset id="ipv6announce" name="ipv6announce" class="primary expanded">
+<legend>Additional OLSRv2 Announcements</legend>
+<div class="addable" data-min="0" data-max="99" data-object="ipv6announce" data-objectify="1">
+<div class="addable-template" style="padding-top:0px;">
+<div class="multi">
+<span class="text">Prefix/Address:</span>
+<span><input name="prefix" size="35" /></span>
+<span><button type="button" class="addable-remove">Remove</button></span>
+</div>
+</div>
+<div class="addable-container"></div>
+<button type="button" class="addable-add">Add</button>
+</div>
+</fieldset>
 <script>
 function colors() {
-    document.getElementById('updatestatus').disabled = true;
+    var input = document.getElementById('olsrd2status');
+    input.style.color = "black";
+    if (input.value.match(/error/)) {
+        input.style.color = "red";
+    } else if (input.value.match(/success/)) {
+        input.style.color = "green";
+    }
     var input = document.getElementById('updatestatus');
     input.style.color = "black";
     document.getElementById('updatefromgithub').disabled = true;
     if (input.value.match(/new version available/)) {
         document.getElementById('updatefromgithub').disabled = false;
         input.style.color = "red";
-        //disable();
     } else if (input.value.match(/up-to-date/)) {
         input.style.color = "green";
-        //enable();
+        // allow same version re-install for development
+        document.getElementById('updatefromgithub').disabled = false;
     } 
+    document.getElementById('updatestatus').disabled = true;
+    document.getElementById('olsrd2status').disabled = true;
+    document.getElementById('eui4address').disabled = true;
+    document.getElementById('nodeiddec').disabled = true;
+    document.getElementById('nodeidhex').disabled = true;
+    document.getElementById('routeriddec').disabled = true;
+    document.getElementById('routeridhex').disabled = true;
+    document.getElementById('niciddec').disabled = true;
+    document.getElementById('nicidhex').disabled = true;
+    document.getElementById('firewallcreated').disabled = true;
+    document.getElementById('tunnel4in6addrv4').disabled = true;
+    var v6nodes = document.getElementById("ipv6ifs").getElementsByTagName('*');
+    for(var i=0; i<v6nodes.length; i++) {
+        if (v6nodes[i].name == "olsrv6intf") {
+            v6nodes[i].disabled = true;
+        } else if (v6nodes[i].name == "ipv6address") {
+            v6nodes[i].disabled = true;
+        } else if (v6nodes[i].name == "prefix") {
+            v6nodes[i].disabled = true;
+        } else if (v6nodes[i].name == "enabled") {
+            // not implemented to wizard-run already
+            v6nodes[i].disabled = true;
+        } else if (v6nodes[i].name == "routerfw") {
+            // not implemented to wizard-run already
+            v6nodes[i].disabled = true;
+        }
+    }
 }
 function validate() {
 }
