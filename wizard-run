@@ -84,16 +84,16 @@ load () {
     enabled="on"
     established="on"
     ipv4="78.41.123.456"
-    bridge="brX"
+    bridge="br8"
     portnumber="5101"
-
+    brlist='"bridge":{"options": ["br7", "br8", "br9"],"other": "false"}'
 
     # get all variables together for output
     echo -n "{\"success\":\"1\",\"data\":{ $packagestatus $autoupdatefromgithub $updatestatus"
     echo -n ",\"enabled\":\"$enabled\",\"established\":\"$established\",\"ipv4\":\"$ipv4\",\"bridge\":\"$bridge\""
     echo -n ",\"portnumber\":\"$portnumber\""
     echo -n " },"
-    echo    " \"definition\":{ }}"
+    echo    " \"definition\":{$brlist}}"
 }
 
 # function called when you click apply
