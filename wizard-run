@@ -53,7 +53,7 @@ dev-type        tap
 proto           udp
 remote          $tunnelserverip
 port            5999
-daemon          $tunneldevice
+#daemon          $tunneldevice
 up-delay
 down-pre
 up-restart
@@ -67,7 +67,7 @@ fast-io
 sndbuf  524288 
 rcvbuf  524288
 mute 2
-verb 0
+verb 1
 #up "$openvpnifupdown"
 #down "$openvpnifupdown"
 #secret $openvpnsecret
@@ -165,6 +165,7 @@ onlinecheck () {
 #commit
 #set protocols static route 78.41.115.228/32 next-hop 192.168.0.1 description 'TunnelServer via ISP'
 #set interfaces openvpn $tunneldevice config-file /config/user-data/funkfeuer.ovpn
+#set interfaces openvpn vtun0 bridge-group bridge br9
 #commit
 #save
 
@@ -273,7 +274,9 @@ load () {
     [ -f $openvpnsecret ] && secretfound="on"
 
     #possible gateway interfaces
-    #ip -4 r | grep -oE "dev .{3,7} " | awk '!x[$2]++ {print $2}' | sort
+    webinterfaces=$(ip -4 r | grep -oE "dev .{3,7} " | awk '!x[$2]++ {print $2}' | sort)
+    gwlist='"int2dest":{"options":["'$(echo $webinterfaces | sed 's/ /","/g')'"],"other":"false"}'
+
     
     #static-route?
     staticto=$(find /opt/vyatta/config/active/protocols/static/route/*/next-hop/$gw2dest -maxdepth 0 | awk -F"/" '{gsub("%2F","/",$9); print $9}')
@@ -304,7 +307,7 @@ load () {
     echo -n ",\"secretfound\":\"$secretfound\""
     echo -n ",\"currentvtunconfig\":\"$currentvtunconfig\""
     echo -n " },"
-    echo    " \"definition\":{$brlist}}"
+    echo    " \"definition\":{$brlist,$gwlist}}"
 }
 
 # function called when you click apply
@@ -463,6 +466,9 @@ jxxllu+yl3fX3XV3/ZuvPwAoGfqJAHAAAA==
     # end
     ####### wizard manual update from github
 
+    #reset/restart the tunnel
+    sudo /opt/vyatta/bin/sudo-users/vyatta-restart-ovpn.pl --vtun vtun0 >>$log 2>>$log
+    
     # for debugging purposes
     cp $INPUT /tmp/result.json
 

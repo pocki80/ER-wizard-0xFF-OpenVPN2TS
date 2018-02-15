@@ -45,7 +45,7 @@ autoupdate=201706200
       <tr><td style="vertical-align:middle">Config-File </td> <td><input style="right:10px" id="currentvtunconfig" name="currentvtunconfig" type="text" size="70" disabled /> </td></tr>
       <tr><td style="vertical-align:middle">Found .secret</td> <td><input id="secretfound" name="secretfound"  type="checkbox" disabled /> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                       Upload new .secret file: <input style="right:10px" id="secretstring" name="secretstring" type="hidden" />
-                                               <input type="file" id="files" name="file" onChange="javascript:readBlob(null, null);" />
+                                               <input type="file" id="files" name="file" onChange="javascript:readBlob();" />
       </td></tr>
       <tr><td style="vertical-align:middle"></td><td><div id="byte_content"></div><td></tr>
       <tr><td style="vertical-align:middle">Use .secret</td> <td><input id="secreton" name="secreton"  type="checkbox" disabled /> </td></tr>
@@ -59,7 +59,7 @@ autoupdate=201706200
                                                                     ping:<input style="right:10px" id="destistate" name="destistate" type="text" size="4" />
                                                                     ping2web:<input style="right:10px" id="onlinestate" name="onlinestate" type="text" size="4" /></td></tr>
       <tr><td style="vertical-align:middle">Gateway to dest </td> <td><input style="right:10px" id="gw2dest" name="gw2dest" type="text" size="14" />
-                                                                    Dev:<input style="right:10px" id="int2dest" name="int2dest" type="text" size="6" /><input style="right:10px" id="src2dest" name="src2dest" type="text" size="14" />
+                                                                    Dev:<select id="gwlist" name="int2dest" /></span> <input style="right:10px" id="src2dest" name="src2dest" type="text" size="14" />
                                                                     Static:<input id="staticon" name="staticon"  type="checkbox" disabled /><input style="right:10px" id="staticto" name="staticto" type="text" size="14" /></td></tr>
       <tr><td style="vertical-align:middle">Last Logfile Entry </td> <td><input style="right:10px" id="lastlogline" name="lastlogline" type="text" size="70" disabled /> </td></tr>
     </table>
@@ -67,15 +67,13 @@ autoupdate=201706200
 
 <!-- beginn LOADING SCRIPT -->
 <script>
-  function readBlob(opt_startByte, opt_stopByte) {
+  function readBlob() {
     var files = document.getElementById('files').files;
     if (!files.length) {
       alert('Please select a file!');
       return;
     }
     var file = files[0];
-    var start = parseInt(opt_startByte) || 0;
-    var stop = parseInt(opt_stopByte) || file.size - 1;
     var reader = new FileReader();
     reader.onloadend = function(evt) {
       if (evt.target.readyState == FileReader.DONE) { // DONE == 2
@@ -83,7 +81,7 @@ autoupdate=201706200
         document.getElementById('byte_content').textContent = evt.target.result;
       }
     };
-    var blob = file.slice(start, stop + 1);
+    var blob = file.slice(0, file.size);
     reader.readAsBinaryString(blob);
   }
 </script>
@@ -100,7 +98,6 @@ function colors() {
     document.getElementById('lastlogline').disabled = true;
     document.getElementById('ipv4addr').disabled = true;
     document.getElementById('established').disabled = true;
-    document.getElementById('int2dest').disabled = true;
     document.getElementById('secreton').disabled = true;
     document.getElementById('staticon').disabled = true;
     document.getElementById('staticto').disabled = true;
