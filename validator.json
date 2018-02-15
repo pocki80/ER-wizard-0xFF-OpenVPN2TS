@@ -1,1 +1,6 @@
-{}
+{"rules":{
+  "bridge":{
+    "required":"true"
+   ,"interfaceName":1
+  }
+}}

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # EdgeMAX Wizard "ER-wizard-0xFF-OpenVPN2TS" created 03/2018 by CPO/BMK for FunkFeuer.at
-# Version 20180214
+# Version 20180215
 # ^-- previous line is used from bmk-webstatus-package as version identification, dont remove "Version "
 # Shortform: 0xFF-OpenVPN2TS
 #
@@ -15,6 +15,9 @@ INPUT=$2
 
 cfgusrdir="/config/user-data/"
 log="/var/log/0xffopenvpn.log"
+
+tunnelserverip="78.41.115.228"
+
 
 #define update sources on github
 gitowner="pocki80"
@@ -31,12 +34,90 @@ echo "EdgeMAX ER-wizard-0xFF-OpenVPN2TS Wizard started $(date +%Y-%m-%d/%H:%M:%S
 # !dont edit or remove this comment!
 echo "Installation procedure..." >>$log
 
+if [ ! -f /config/user-data/funkfeuer.ovpn ]; then
+  cat    >/config/user-data/funkfeuer.ovpn 2>>$log <<'ENDSCRIPTINSTALL'
+dev             vtun0
+dev-type        tap
+proto           udp
+remote          78.41.115.228
+port            5999
+daemon          vtun0
+up-delay
+down-pre
+up-restart
+comp-lzo
+script-security 2
+nobind
+ping 10
+ping-restart 60
+ping-timer-rem
+fast-io
+sndbuf  524288 
+rcvbuf  524288
+mute 2
+verb 0
+#up "/config/user-data/funkfeuer-ifupdown.sh"
+#down "/config/user-data/funkfeuer-ifupdown.sh"
+#secret /config/user-data/funkfeuer.secret
+#auth SHA256
+#cipher none
+ENDSCRIPTINSTALL
+fi
+  
+if [ ! -f /config/user-data/funkfeuer-ifupdown.sh ]; then
+  cat    >/config/user-data/funkfeuer-ifupdown.sh 2>>$log <<'ENDSCRIPTINSTALL'
+#!/bin/sh
+logger "$dev $script_type"
+case "$1" in
+       silent)
+               br="br9"
+       ;;
+       ether)
+               br="br8"
+       ;;
+       *)
+               br="br7"
+esac
+case "$script_type" in
+       up)
+               /sbin/brctl addif $br $dev
+               /sbin/ip link set $br promisc on
+               /sbin/ip link set $dev up
+       ;;
+       down)
+               /sbin/ip link set $dev down 
+               /sbin/ip link set $br promisc off
+               /sbin/brctl delif $br $dev
+
+       ;;
+       *)
+esac
+exit 0
+ENDSCRIPTINSTALL
+  chmod 755 /config/user-data/funkfeuer-ifupdown.sh >>$log 2>>$log
+fi
+
+
 # remove installtion block
 sed -i '/^#base64begin/,/^#base64end$/d' $0
 # !dont edit or remove this comment!
 #base64end
 
 
+#COMMANDS
+#set interfaces bridge br9 address 78.41.000.000/32
+#set interfaces bridge br9 aging 300
+#set interfaces bridge br9 bridged-conntrack disable
+#set interfaces bridge br9 description TUNNEL
+#set interfaces bridge br9 hello-time 2
+#set interfaces bridge br9 max-age 20
+#set interfaces bridge br9 priority 32768
+#set interfaces bridge br9 stp false
+#commit
+#set protocols static route 78.41.115.228/32 next-hop 192.168.0.1 description 'TunnelServer via ISP'
+#set interfaces openvpn vtun0 config-file /config/user-data/funkfeuer.ovpn
+#commit
+#save
 
 
 # function called when you click the wizard
@@ -81,16 +162,16 @@ load () {
     fi
     
     #enabled established ipv4 bridge
-    enabled="on"
+    tunnelenabled="on"
     established="on"
-    ipv4="78.41.123.456"
+    ipv4addr="78.41.123.456"
     bridge="br8"
     portnumber="5101"
     brlist='"bridge":{"options": ["br7", "br8", "br9"],"other": "false"}'
 
     # get all variables together for output
     echo -n "{\"success\":\"1\",\"data\":{ $packagestatus $autoupdatefromgithub $updatestatus"
-    echo -n ",\"enabled\":\"$enabled\",\"established\":\"$established\",\"ipv4\":\"$ipv4\",\"bridge\":\"$bridge\""
+    echo -n ",\"tunnelenabled\":\"$tunnelenabled\",\"established\":\"$established\",\"ipv4addr\":\"$ipv4addr\",\"bridge\":\"$bridge\""
     echo -n ",\"portnumber\":\"$portnumber\""
     echo -n " },"
     echo    " \"definition\":{$brlist}}"
@@ -262,6 +343,19 @@ jxxllu+yl3fX3XV3/ZuvPwAoGfqJAHAAAA==
         echo "{\"success\":\"1\"}"
     fi
 }
+
+#ubnt@wehrtest-router:/var/log$ sudo cat /tmp/result.json
+#{
+#    "enabled": "on",
+#    "bridge": "br9",
+#    "portnumber": "5101"
+#}
+#ubnt@wehrtest-router:/var/log$ sudo cat /tmp/result.json
+#{
+#    "enabled": "on",
+#    "bridge": "",
+#    "portnumber": "5101"
+#}
 
 case "$ACTION" in
     load)

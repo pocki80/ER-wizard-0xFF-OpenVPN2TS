@@ -2,7 +2,7 @@
 
 EdgeMAX Wizard "ER-wizard-0xFF-OpenVPN2TS" created 03/2018 by CPO for FunkFeuer.at
 Works on EdgeRouter and EdgeRouter X / X-SFP (system version 1.9.7+)
-versioninfo=201802145
+versioninfo=201802146
 ^-- use version identifier as number: YYYYMMDDX whereas X can be intraday-version
 autoupdate=201706200
 ^-- set autoupdate the same version identifier to allow autoupdates
@@ -28,10 +28,10 @@ autoupdate=201706200
 <fieldset id="settings" name="settings" class="primary expanded">
     <legend>Tunnel Settings</legend>
     <table border="0">
-      <tr><td style="vertical-align:middle">Tunnel enabled</td> <td><input id="enabled" name="enabled"  type="checkbox" /> <td></tr>
+      <tr><td style="vertical-align:middle">Tunnel enabled</td> <td><input id="tunnelenabled" name="tunnelenabled"  type="checkbox" /> <td></tr>
       <tr><td style="vertical-align:middle">Tunnel established</td> <td><input id="established" name="established"  type="checkbox" disabled /> <td></tr>
       <tr><td style="vertical-align:middle">Bridge-IF </td> <td><input style="right:10px" id="bridge" name="bridge" type="text" size="4" disabled /> <span><select id="brlist" name="bridge" /></span>
-      <tr><td style="vertical-align:middle">Interface IPv4 </td> <td><input style="right:10px" id="ipv4" name="ipv4" type="text" size="20" disabled /> <td></tr>
+      <tr><td style="vertical-align:middle">Interface IPv4 </td> <td><input style="right:10px" id="ipv4addr" name="ipv4addr" type="text" size="20" disabled /> <td></tr>
       <tr><td style="vertical-align:middle">OpenVPN Port </td> <td><input style="right:10px" id="portnumber" name="portnumber" type="text" size="4" /> <td></tr>
     </table>
 </fieldset>
@@ -43,7 +43,7 @@ function colors() {
     document.getElementById('packagestatus').disabled = true;
     document.getElementById('updatestatus').disabled = true;
     document.getElementById('bridge').disabled = true;
-    document.getElementById('ipv4').disabled = true;
+    document.getElementById('ipv4addr').disabled = true;
     document.getElementById('established').disabled = true;
     var input = document.getElementById('packagestatus');
     input.style.color = "black";
