@@ -17,6 +17,10 @@ cfgusrdir="/config/user-data/"
 log="/var/log/0xffopenvpn.log"
 
 tunnelserverip="78.41.115.228"
+tunneldevice="vtun0"
+openvpnconfig="/config/user-data/funkfeuer.ovpn"
+openvpnsecret="/config/user-data/funkfeuer.secret"
+openvpnifupdown="/config/user-data/funkfeuer-ifupdown.sh"
 
 
 #define update sources on github
@@ -34,14 +38,15 @@ echo "EdgeMAX ER-wizard-0xFF-OpenVPN2TS Wizard started $(date +%Y-%m-%d/%H:%M:%S
 # !dont edit or remove this comment!
 echo "Installation procedure..." >>$log
 
-if [ ! -f /config/user-data/funkfeuer.ovpn ]; then
-  cat    >/config/user-data/funkfeuer.ovpn 2>>$log <<'ENDSCRIPTINSTALL'
-dev             vtun0
+if [ ! -f $openvpnconfig ]; then
+  echo "Create file $openvpnconfig..." >>$log
+  cat    >$openvpnconfig 2>>$log <<ENDSCRIPTINSTALL
+dev             $tunneldevice
 dev-type        tap
 proto           udp
-remote          78.41.115.228
+remote          $tunnelserverip
 port            5999
-daemon          vtun0
+daemon          $tunneldevice
 up-delay
 down-pre
 up-restart
@@ -56,16 +61,17 @@ sndbuf  524288
 rcvbuf  524288
 mute 2
 verb 0
-#up "/config/user-data/funkfeuer-ifupdown.sh"
-#down "/config/user-data/funkfeuer-ifupdown.sh"
-#secret /config/user-data/funkfeuer.secret
+#up "$openvpnifupdown"
+#down "$openvpnifupdown"
+#secret $openvpnsecret
 #auth SHA256
 #cipher none
 ENDSCRIPTINSTALL
 fi
   
-if [ ! -f /config/user-data/funkfeuer-ifupdown.sh ]; then
-  cat    >/config/user-data/funkfeuer-ifupdown.sh 2>>$log <<'ENDSCRIPTINSTALL'
+if [ ! -f $openvpnifupdown ]; then
+  echo "Create file $openvpnifupdown..." >>$log
+  cat    >$openvpnifupdown 2>>$log <<'ENDSCRIPTINSTALL'
 #!/bin/sh
 logger "$dev $script_type"
 case "$1" in
@@ -94,9 +100,8 @@ case "$script_type" in
 esac
 exit 0
 ENDSCRIPTINSTALL
-  chmod 755 /config/user-data/funkfeuer-ifupdown.sh >>$log 2>>$log
+  chmod 755 $openvpnifupdown >>$log 2>>$log
 fi
-
 
 # remove installtion block
 sed -i '/^#base64begin/,/^#base64end$/d' $0
@@ -115,15 +120,23 @@ sed -i '/^#base64begin/,/^#base64end$/d' $0
 #set interfaces bridge br9 stp false
 #commit
 #set protocols static route 78.41.115.228/32 next-hop 192.168.0.1 description 'TunnelServer via ISP'
-#set interfaces openvpn vtun0 config-file /config/user-data/funkfeuer.ovpn
+#set interfaces openvpn $tunneldevice config-file /config/user-data/funkfeuer.ovpn
 #commit
 #save
+
+#set    interfaces openvpn $tunneldevice disable
+#delete interfaces openvpn $tunneldevice disable
 
 
 # function called when you click the wizard
 load () {
     echo "Load procedure..." >>$log
-    packagestatus='"packagestatus":"ok"'
+
+    if [ ! -f $openvpnconfig ]; then
+        packagestatus='err: missing config file'
+    else
+        packagestatus='ok'
+    fi
 
     ####### wizard version check against github
     # 
@@ -161,18 +174,50 @@ load () {
         autoupdatefromgithub=',"autoupdatefromgithub":"on"'
     fi
     
-    #enabled established ipv4 bridge
+    #get dev from config file
+    tunneldevice=$(awk '{print $1","$2}' $openvpnconfig | cut -d'#' -f1 | grep -iE "^dev," | cut -d, -f2)
+    if [[ "$tunneldevice" =~ vtun[0-9]{1,2} ]]; then
+        #check for running openvpn using this vtun device
+        currentvtunprocess=$(ps aux | grep -v grep | grep -E "/usr/sbin/openvpn .* /var/run/openvpn-$tunneldevice.pid .*" | awk '{print $2}')
+        #find config file of this process
+        currentvtunconfig=$(ps $currentvtunprocess | tail -1 | grep -oE "\-\-config [A-Za-z0-9~!#$%^&*()_+-/]* " | awk '{print $2}')
+        #verify that this is our config file
+        [ "$currentvtunconfig" == "$openvpnconfig" ] || packagestatus='err: openvpn@'$tunneldevice' using '$currentvtunconfig
+    else
+        packagestatus='err: wrong or missing dev parameter "'$tunneldevice'"'
+    fi
+    lastlogline=$(grep " openvpn\[" /var/log/messages | tail -1 | sed -e "s/$(hostname) openvpn\[.*\]: //")
+    
+    #get assigned bridge of vtun device
+    bridge=$(cat /opt/vyatta/config/active/interfaces/openvpn/$tunneldevice/bridge-group/bridge/node.val 2>/dev/null)
+    [ "$bridge" ] &&
+      ipv4addr=$(ip -f inet addr | awk '/^[0-9]:*|inet/ { print $2 }' | sed ':a;N;$!ba;s/:\n/;/g' | grep -E "^$bridge" | cut -d";" -f2) ||
+      packagestatus='err: '$tunneldevice' is not assigned to any bridge'
+    
+    #get local bridges
+    brinterfaces=$(ls /opt/vyatta/config/active/interfaces/bridge)
+    brlist='"bridge":{"options":["'$(echo $brinterfaces | sed 's/ /","/g')'"],"other":"false"}'
+    [ "$brinterfaces" ] || packagestatus='err: no bridge interfaces found'
+
+    #get portnumber from config file
+    portnumber=$(awk '{print $1","$2}' $openvpnconfig | cut -d'#' -f1 | grep -iE "^port," | cut -d, -f2)
+
+    #get tunnel and bridge up/down state
+    tunnelupdown=$(ip -4 link | grep $tunneldevice":" | grep -oE "state UP |state DOWN " | cut -d" " -f2)
+    bridgeupdown=$(ip -4 link | grep $bridge":" | grep -oE "state UP |state DOWN " | cut -d" " -f2)
+    [ "$tunnelupdown" == "UP" ] && [ "$bridgeupdown" == "UP" ] && established="on"
+
+    #dummy values for development
     tunnelenabled="on"
-    established="on"
-    ipv4addr="78.41.123.456"
-    bridge="br8"
-    portnumber="5101"
-    brlist='"bridge":{"options": ["br7", "br8", "br9"],"other": "false"}'
 
     # get all variables together for output
+    packagestatus='"packagestatus":"'$packagestatus'"'
     echo -n "{\"success\":\"1\",\"data\":{ $packagestatus $autoupdatefromgithub $updatestatus"
     echo -n ",\"tunnelenabled\":\"$tunnelenabled\",\"established\":\"$established\",\"ipv4addr\":\"$ipv4addr\",\"bridge\":\"$bridge\""
     echo -n ",\"portnumber\":\"$portnumber\""
+    echo -n ",\"lastlogline\":\"$lastlogline\""
+    echo -n ",\"tunneldevice\":\"$tunneldevice\""
+    echo -n ",\"currentvtunconfig\":\"$currentvtunconfig\""
     echo -n " },"
     echo    " \"definition\":{$brlist}}"
 }

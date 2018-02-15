@@ -1,5 +1,9 @@
 {"rules":{
-  "bridge":{
+  "portnumber":{
+    "required":"true"
+   ,"number":1
+  }
+ ,"tunneldevice":{
     "required":"true"
    ,"interfaceName":1
   }
