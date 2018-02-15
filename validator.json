@@ -7,4 +7,8 @@
     "required":"true"
    ,"interfaceName":1
   }
+ ,"destination":{
+    "required":"true"
+   ,"ipv4":1
+  }
 }}

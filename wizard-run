@@ -28,6 +28,13 @@ gitowner="pocki80"
 gitrepo="ER-wizard-0xFF-OpenVPN2TS"
 gitbranch="master"
 
+# hosts to check for online status
+v4iphost='8.8.8.8'
+v4dnshost='www.google.com'
+v6iphost='2001:4860:4860::8888'
+v6dnshost='www.google.com'
+
+
 #
 # DO NOT EDIT BELOW HERE !
 #
@@ -107,6 +114,43 @@ fi
 sed -i '/^#base64begin/,/^#base64end$/d' $0
 # !dont edit or remove this comment!
 #base64end
+
+# function to check if connectivity is given to download packages
+onlinecheck () {
+    ping="ping -c 1 -W 1 ";
+    ping6="ping6 -c 1 -W 1 ";
+    $ping $v4iphost >/dev/null 2>/dev/null
+    if [[ $? == 0 ]]; then
+        # ipv4 ok
+        $ping6 $v6iphost >/dev/null 2>/dev/null
+        if [[ $? == 0 ]]; then
+            # ipv6 ok
+            $ping6 $v6dnshost >/dev/null 2>/dev/null
+            if [[ $? == 0 ]]; then
+                # ipv6dns ok
+                return 0
+            else
+                # ipv6dns not ok
+                return 1
+            fi
+        else
+            # ipv6 not ok, fallback to ipv4
+            # issue: dns resolver prefers v6 (if ipv6 is configured)
+            $ping $v4dnshost >/dev/null 2>/dev/null
+            if [[ $? == 0 ]]; then
+                # ipv4dns ok
+                return 0
+            else
+                # ipv4dns not ok
+                return 1
+            fi
+        fi
+    else
+        # ipv4 not ok
+        return 1
+    fi
+}
+
 
 
 #COMMANDS
@@ -207,8 +251,39 @@ load () {
     bridgeupdown=$(ip -4 link | grep $bridge":" | grep -oE "state UP |state DOWN " | cut -d" " -f2)
     [ "$tunnelupdown" == "UP" ] && [ "$bridgeupdown" == "UP" ] && established="on"
 
-    #dummy values for development
-    tunnelenabled="on"
+    destination=$(awk '{print $1","$2}' $openvpnconfig | cut -d'#' -f1 | grep -iE "^remote," | cut -d, -f2)
+    todestination=$(ip -4 r get $destination 2>/dev/null | head -1 | awk '{print $5","$3","$7}')
+    int2dest=$(echo $todestination | cut -d"," -f1)
+    gw2dest=$(echo $todestination | cut -d"," -f2)
+    src2dest=$(echo $todestination | cut -d"," -f3)
+    
+    #ping-to-destination?
+    ping="ping -c 1 -W 1 ";
+    $ping $destination >/dev/null 2>/dev/null
+    [[ $? == 0 ]] && destistate="ok" || destistate="err"
+    
+    #ping to web
+    onlinecheck
+    [[ $? == 0 ]] && onlinestate="ok" || onlinestate="err"
+
+    #check for .secret
+    secretfile=$(awk '{print $1","$2}' $openvpnconfig | cut -d'#' -f1 | grep -iE "^secret," | cut -d, -f2)
+    [ "$secretfile" ] && [ -f $secretfile ] && [ $(stat -c %s $secretfile) -ge 300 ] && secreton="on"
+    
+    [ -f $openvpnsecret ] && secretfound="on"
+
+    #possible gateway interfaces
+    #ip -4 r | grep -oE "dev .{3,7} " | awk '!x[$2]++ {print $2}' | sort
+    
+    #static-route?
+    staticto=$(find /opt/vyatta/config/active/protocols/static/route/*/next-hop/$gw2dest -maxdepth 0 | awk -F"/" '{gsub("%2F","/",$9); print $9}')
+    [ "$staticto" ] && staticon="on"
+    
+    #extract openvpn-settings
+    #sed -n "/^    openvpn $tunneldevice {$/,/^    }$/p" /config/config.boot
+    [ $(sed -n "/^    openvpn $tunneldevice {$/,/^    }$/p" /config/config.boot | grep -cE "^        disable$") -eq 1 ] && disabled="on"
+    [ $(sed -n "/^    openvpn $tunneldevice {$/,/^    }$/p" /config/config.boot | grep -c "config-file $openvpnconfig") -eq 1 ] && configured="on"
+    [ "$configured" ] && [ ! "$disabled" ] && tunnelenabled="on"
 
     # get all variables together for output
     packagestatus='"packagestatus":"'$packagestatus'"'
@@ -217,6 +292,16 @@ load () {
     echo -n ",\"portnumber\":\"$portnumber\""
     echo -n ",\"lastlogline\":\"$lastlogline\""
     echo -n ",\"tunneldevice\":\"$tunneldevice\""
+    echo -n ",\"destination\":\"$destination\""
+    echo -n ",\"int2dest\":\"$int2dest\""
+    echo -n ",\"gw2dest\":\"$gw2dest\""
+    echo -n ",\"src2dest\":\"$src2dest\""
+    echo -n ",\"destistate\":\"$destistate\""
+    echo -n ",\"onlinestate\":\"$onlinestate\""
+    echo -n ",\"staticto\":\"$staticto\""
+    echo -n ",\"staticon\":\"$staticon\""
+    echo -n ",\"secreton\":\"$secreton\""
+    echo -n ",\"secretfound\":\"$secretfound\""
     echo -n ",\"currentvtunconfig\":\"$currentvtunconfig\""
     echo -n " },"
     echo    " \"definition\":{$brlist}}"

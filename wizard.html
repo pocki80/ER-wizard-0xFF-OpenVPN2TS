@@ -2,7 +2,7 @@
 
 EdgeMAX Wizard "ER-wizard-0xFF-OpenVPN2TS" created 03/2018 by CPO for FunkFeuer.at
 Works on EdgeRouter and EdgeRouter X / X-SFP (system version 1.9.7+)
-versioninfo=201802150
+versioninfo=201802151
 ^-- use version identifier as number: YYYYMMDDX whereas X can be intraday-version
 autoupdate=201706200
 ^-- set autoupdate the same version identifier to allow autoupdates
@@ -25,31 +25,89 @@ autoupdate=201706200
   </table>
 </div>
 
+<style>
+  #byte_content {
+    margin: 5px 0;
+    max-height: 100px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+</style>
+
 <fieldset id="settings" name="settings" class="primary expanded">
     <legend>Tunnel Settings</legend>
     <table border="0">
-      <tr><td style="vertical-align:middle">Tunnel enabled</td> <td><input id="tunnelenabled" name="tunnelenabled"  type="checkbox" /> <td></tr>
-      <tr><td style="vertical-align:middle">Tunnel established</td> <td><input id="established" name="established"  type="checkbox" disabled /> <td></tr>
-      <tr><td style="vertical-align:middle">Bridge-IF </td> <td><span><select id="brlist" name="bridge" /></span>
-      <tr><td style="vertical-align:middle">Bridge-IPv4 </td> <td><input style="right:10px" id="ipv4addr" name="ipv4addr" type="text" size="20" disabled /> <td></tr>
-      <tr><td style="vertical-align:middle">OpenVPN Port </td> <td><input style="right:10px" id="portnumber" name="portnumber" type="text" size="4" /> <td></tr>
-      <tr><td style="vertical-align:middle">Tunnel Device </td> <td><input style="right:10px" id="tunneldevice" name="tunneldevice" type="text" size="8" /> <td></tr>
-      <tr><td style="vertical-align:middle">Config-File </td> <td><input style="right:10px" id="currentvtunconfig" name="currentvtunconfig" type="text" size="70" disabled /> <td></tr>
-      <tr><td style="vertical-align:middle">Last Logfile Entry </td> <td><input style="right:10px" id="lastlogline" name="lastlogline" type="text" size="70" disabled /> <td></tr>
+      <tr><td style="vertical-align:middle" width=120>Tunnel enabled</td> <td><input id="tunnelenabled" name="tunnelenabled"  type="checkbox" /> </td></tr>
+      <tr><td style="vertical-align:middle">Tunnel established</td> <td><input id="established" name="established"  type="checkbox" disabled /> </td></tr>
+      <tr><td style="vertical-align:middle">Bridge-IF </td> <td><span><select id="brlist" name="bridge" /></span> IP:<input style="right:10px" id="ipv4addr" name="ipv4addr" type="text" size="14" disabled /> </td></tr>
+      <tr><td style="vertical-align:middle">OpenVPN Port </td> <td><input style="right:10px" id="portnumber" name="portnumber" type="text" size="4" /> </td></tr>
+      <tr><td style="vertical-align:middle">Tunnel Device </td> <td><input style="right:10px" id="tunneldevice" name="tunneldevice" type="text" size="8" /> </td></tr>
+      <tr><td style="vertical-align:middle">Config-File </td> <td><input style="right:10px" id="currentvtunconfig" name="currentvtunconfig" type="text" size="70" disabled /> </td></tr>
+      <tr><td style="vertical-align:middle">Found .secret</td> <td><input id="secretfound" name="secretfound"  type="checkbox" disabled /> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                      Upload new .secret file: <input style="right:10px" id="secretstring" name="secretstring" type="hidden" />
+                                               <input type="file" id="files" name="file" onChange="javascript:readBlob(null, null);" />
+      </td></tr>
+      <tr><td style="vertical-align:middle"></td><td><div id="byte_content"></div><td></tr>
+      <tr><td style="vertical-align:middle">Use .secret</td> <td><input id="secreton" name="secreton"  type="checkbox" disabled /> </td></tr>
     </table>
 </fieldset>
 
+<fieldset id="status" name="status" class="primary expanded">
+    <legend>Status Infos</legend>
+    <table border="0">
+      <tr><td style="vertical-align:middle" width=120>Destination IPv4 </td> <td><input style="right:10px" id="destination" name="destination" type="text" size="14" disabled />
+                                                                    ping:<input style="right:10px" id="destistate" name="destistate" type="text" size="4" />
+                                                                    ping2web:<input style="right:10px" id="onlinestate" name="onlinestate" type="text" size="4" /></td></tr>
+      <tr><td style="vertical-align:middle">Gateway to dest </td> <td><input style="right:10px" id="gw2dest" name="gw2dest" type="text" size="14" />
+                                                                    Dev:<input style="right:10px" id="int2dest" name="int2dest" type="text" size="6" /><input style="right:10px" id="src2dest" name="src2dest" type="text" size="14" />
+                                                                    Static:<input id="staticon" name="staticon"  type="checkbox" disabled /><input style="right:10px" id="staticto" name="staticto" type="text" size="14" /></td></tr>
+      <tr><td style="vertical-align:middle">Last Logfile Entry </td> <td><input style="right:10px" id="lastlogline" name="lastlogline" type="text" size="70" disabled /> </td></tr>
+    </table>
+</fieldset>
+
+<!-- beginn LOADING SCRIPT -->
+<script>
+  function readBlob(opt_startByte, opt_stopByte) {
+    var files = document.getElementById('files').files;
+    if (!files.length) {
+      alert('Please select a file!');
+      return;
+    }
+    var file = files[0];
+    var start = parseInt(opt_startByte) || 0;
+    var stop = parseInt(opt_stopByte) || file.size - 1;
+    var reader = new FileReader();
+    reader.onloadend = function(evt) {
+      if (evt.target.readyState == FileReader.DONE) { // DONE == 2
+        document.getElementById('secretstring').value = evt.target.result;
+        document.getElementById('byte_content').textContent = evt.target.result;
+      }
+    };
+    var blob = file.slice(start, stop + 1);
+    reader.readAsBinaryString(blob);
+  }
+</script>
+<!-- END LOADING SCRIPT -->
 
 <br><br>
 <script>
 function colors() {
     document.getElementById('packagestatus').disabled = true;
     document.getElementById('updatestatus').disabled = true;
+    document.getElementById('destination').disabled = true;
     //document.getElementById('tunneldevice').disabled = true;
     document.getElementById('currentvtunconfig').disabled = true;
     document.getElementById('lastlogline').disabled = true;
     document.getElementById('ipv4addr').disabled = true;
     document.getElementById('established').disabled = true;
+    document.getElementById('int2dest').disabled = true;
+    document.getElementById('secreton').disabled = true;
+    document.getElementById('staticon').disabled = true;
+    document.getElementById('staticto').disabled = true;
+    document.getElementById('gw2dest').disabled = true;
+    document.getElementById('src2dest').disabled = true;
+    document.getElementById('destistate').disabled = true;
+    document.getElementById('onlinestate').disabled = true;
     var input = document.getElementById('packagestatus');
     input.style.color = "black";
     if (input.value.match(/err/)) {
