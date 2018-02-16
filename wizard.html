@@ -2,7 +2,7 @@
 
 EdgeMAX Wizard "ER-wizard-0xFF-OpenVPN2TS" created 03/2018 by CPO for FunkFeuer.at
 Works on EdgeRouter and EdgeRouter X / X-SFP (system version 1.9.7+)
-versioninfo=201802151
+versioninfo=201802162
 ^-- use version identifier as number: YYYYMMDDX whereas X can be intraday-version
 autoupdate=201706200
 ^-- set autoupdate the same version identifier to allow autoupdates
@@ -14,7 +14,7 @@ autoupdate=201706200
 </div>
 <legend style="position:absolute;right:0px;padding:5px;">
     <center>EdgeMAX Wizard "ER-wizard-0xFF-OpenVPN2TS"<br>created 03/2018 by CPO for FunkFeuer.at<br>
-    Version 20180215</center>
+    Version 20180216</center>
 </legend>
 <div style="padding:15px;border: 1px solid lightgray;width:648px">
   <table border="0">
@@ -22,6 +22,7 @@ autoupdate=201706200
     <tr><td style="vertical-align:middle">Update Info:</td>    <td><input style="right:10px" id="updatestatus" name="updatestatus" type="text" size="60" disabled /></td></tr>
     <tr><td colspan="2"><div><span><input id="updatefromgithub" name="updatefromgithub" type="checkbox" />&nbsp;</span></div><div><span class="text" data-infotip='Load and install newest version directly from Github'> Upgrade Wizard from GitHub (online only) on 'Apply'</span></div></td></tr>
     <tr><td colspan="2"><div><span><input id="autoupdatefromgithub" name="autoupdatefromgithub" type="checkbox" />&nbsp;</span></div><div><span class="text" data-infotip='Runs a daily job checking for updates - installs available auto-updates automatically'> Upgrade Wizard from GitHub <b>automatically</b></span></div></td></tr>
+    <tr><td colspan="2"><div><span><input id="resetopenvpnnow" name="resetopenvpnnow" type="checkbox" />&nbsp;</span></div><div><span class="text" data-infotip='Reset OpenVPN process / Restart tunnel interface'> Reset OpenVPN process / Restart tunnel interface on 'Apply'</span></div></td></tr>
   </table>
 </div>
 
@@ -48,7 +49,7 @@ autoupdate=201706200
                                                <input type="file" id="files" name="file" onChange="javascript:readBlob();" />
       </td></tr>
       <tr><td style="vertical-align:middle"></td><td><div id="byte_content"></div><td></tr>
-      <tr><td style="vertical-align:middle">Use .secret</td> <td><input id="secreton" name="secreton"  type="checkbox" disabled /> </td></tr>
+      <tr><td style="vertical-align:middle">Use .secret</td> <td><input id="secreton" name="secreton"  type="checkbox" /> </td></tr>
     </table>
 </fieldset>
 
@@ -98,7 +99,6 @@ function colors() {
     document.getElementById('lastlogline').disabled = true;
     document.getElementById('ipv4addr').disabled = true;
     document.getElementById('established').disabled = true;
-    document.getElementById('secreton').disabled = true;
     document.getElementById('staticon').disabled = true;
     document.getElementById('staticto').disabled = true;
     document.getElementById('gw2dest').disabled = true;

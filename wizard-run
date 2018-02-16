@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # EdgeMAX Wizard "ER-wizard-0xFF-OpenVPN2TS" created 03/2018 by CPO/BMK for FunkFeuer.at
-# Version 20180215
+# Version 20180216
 # ^-- previous line is used from bmk-webstatus-package as version identification, dont remove "Version "
 # Shortform: 0xFF-OpenVPN2TS
 #
@@ -38,6 +38,11 @@ v6dnshost='www.google.com'
 #
 # DO NOT EDIT BELOW HERE !
 #
+
+##checks
+#numbers only
+re='^[0-9]+$'
+
 
 echo "EdgeMAX ER-wizard-0xFF-OpenVPN2TS Wizard started $(date +%Y-%m-%d/%H:%M:%S.%N) Session="$$ >>$log
 
@@ -110,6 +115,43 @@ ENDSCRIPTINSTALL
   chmod 755 $openvpnifupdown >>$log 2>>$log
 fi
 
+#check if there's at least one bridge between br2 andf br9, create br9 if not any
+if [ $(ls /opt/vyatta/config/active/interfaces/bridge | grep -vwE "br0|br1" | grep -cE "br.") -eq 0 ]; then
+    echo "create br9 on install" >>$log
+    commandlist[${#commandlist[@]}]="set interfaces bridge br9"
+    commandlist[${#commandlist[@]}]="set interfaces bridge br9 aging 300"
+    commandlist[${#commandlist[@]}]="set interfaces bridge br9 bridged-conntrack disable"
+    commandlist[${#commandlist[@]}]="set interfaces bridge br9 description TUNNEL"
+    commandlist[${#commandlist[@]}]="set interfaces bridge br9 hello-time 2"
+    commandlist[${#commandlist[@]}]="set interfaces bridge br9 max-age 20"
+    commandlist[${#commandlist[@]}]="set interfaces bridge br9 priority 32768"
+    commandlist[${#commandlist[@]}]="set interfaces bridge br9 stp false"
+    cmd="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
+    tfile=$(mktemp)
+(
+$cmd begin
+ret=0
+for executecmd in "${commandlist[@]}"; do
+    if [ $ret == 0 ]; then
+        echo "--"$executecmd >>$log
+        $cmd $executecmd || ret=1
+    else
+        echo "--skipped: "$executecmd >>$log
+    fi
+done
+[ $ret == 0 ] && $cmd commit || ret=1
+[ $ret == 0 ] && $cmd save || ret=1
+$cmd end
+exit $ret
+) >$tfile 2>&1
+    ret=$?
+    output=$(cat $tfile)
+    rm -f $tfile
+    echo "${output}" >> $log
+    commandlist=[]
+fi
+
+
 # remove installtion block
 sed -i '/^#base64begin/,/^#base64end$/d' $0
 # !dont edit or remove this comment!
@@ -151,34 +193,12 @@ onlinecheck () {
     fi
 }
 
-
-
-#COMMANDS
-#set interfaces bridge br9 address 78.41.000.000/32
-#set interfaces bridge br9 aging 300
-#set interfaces bridge br9 bridged-conntrack disable
-#set interfaces bridge br9 description TUNNEL
-#set interfaces bridge br9 hello-time 2
-#set interfaces bridge br9 max-age 20
-#set interfaces bridge br9 priority 32768
-#set interfaces bridge br9 stp false
-#commit
-#set protocols static route 78.41.115.228/32 next-hop 192.168.0.1 description 'TunnelServer via ISP'
-#set interfaces openvpn $tunneldevice config-file /config/user-data/funkfeuer.ovpn
-#set interfaces openvpn vtun0 bridge-group bridge br9
-#commit
-#save
-
-#set    interfaces openvpn $tunneldevice disable
-#delete interfaces openvpn $tunneldevice disable
-
-
 # function called when you click the wizard
 load () {
     echo "Load procedure..." >>$log
 
     if [ ! -f $openvpnconfig ]; then
-        packagestatus='err: missing config file'
+        packagestatus='err: missing config file - reinstall this wizard!'
     else
         packagestatus='ok'
     fi
@@ -220,14 +240,19 @@ load () {
     fi
     
     #get dev from config file
-    tunneldevice=$(awk '{print $1","$2}' $openvpnconfig | cut -d'#' -f1 | grep -iE "^dev," | cut -d, -f2)
+    tunneldevice=$(awk '{print $1","$2}' $openvpnconfig 2>/dev/null | cut -d'#' -f1 | grep -iE "^dev," | cut -d, -f2)
     if [[ "$tunneldevice" =~ vtun[0-9]{1,2} ]]; then
         #check for running openvpn using this vtun device
         currentvtunprocess=$(ps aux | grep -v grep | grep -E "/usr/sbin/openvpn .* /var/run/openvpn-$tunneldevice.pid .*" | awk '{print $2}')
-        #find config file of this process
-        currentvtunconfig=$(ps $currentvtunprocess | tail -1 | grep -oE "\-\-config [A-Za-z0-9~!#$%^&*()_+-/]* " | awk '{print $2}')
-        #verify that this is our config file
-        [ "$currentvtunconfig" == "$openvpnconfig" ] || packagestatus='err: openvpn@'$tunneldevice' using '$currentvtunconfig
+        if [ "$currentvtunprocess" ]; then
+            #find config file of this process
+            currentvtunconfig=$(ps $currentvtunprocess | tail -1 | grep -oE "\-\-config [A-Za-z0-9~!#$%^&*()_+-/]* " | awk '{print $2}')
+            #verify that this is our config file
+            [ "$currentvtunconfig" == "$openvpnconfig" ] || packagestatus='err: openvpn@'$tunneldevice' using '$currentvtunconfig
+        else
+            currentvtunconfig=$openvpnconfig
+            packagestatus='ok: openvpn for '$tunneldevice' not running'
+        fi
     else
         packagestatus='err: wrong or missing dev parameter "'$tunneldevice'"'
     fi
@@ -245,14 +270,14 @@ load () {
     [ "$brinterfaces" ] || packagestatus='err: no bridge interfaces found'
 
     #get portnumber from config file
-    portnumber=$(awk '{print $1","$2}' $openvpnconfig | cut -d'#' -f1 | grep -iE "^port," | cut -d, -f2)
+    portnumber=$(awk '{print $1","$2}' $openvpnconfig 2>/dev/null | cut -d'#' -f1 | grep -iE "^port," | cut -d, -f2)
 
     #get tunnel and bridge up/down state
     tunnelupdown=$(ip -4 link | grep $tunneldevice":" | grep -oE "state UP |state DOWN " | cut -d" " -f2)
     bridgeupdown=$(ip -4 link | grep $bridge":" | grep -oE "state UP |state DOWN " | cut -d" " -f2)
     [ "$tunnelupdown" == "UP" ] && [ "$bridgeupdown" == "UP" ] && established="on"
 
-    destination=$(awk '{print $1","$2}' $openvpnconfig | cut -d'#' -f1 | grep -iE "^remote," | cut -d, -f2)
+    destination=$(awk '{print $1","$2}' $openvpnconfig 2>/dev/null | cut -d'#' -f1 | grep -iE "^remote," | cut -d, -f2)
     todestination=$(ip -4 r get $destination 2>/dev/null | head -1 | awk '{print $5","$3","$7}')
     int2dest=$(echo $todestination | cut -d"," -f1)
     gw2dest=$(echo $todestination | cut -d"," -f2)
@@ -268,7 +293,7 @@ load () {
     [[ $? == 0 ]] && onlinestate="ok" || onlinestate="err"
 
     #check for .secret
-    secretfile=$(awk '{print $1","$2}' $openvpnconfig | cut -d'#' -f1 | grep -iE "^secret," | cut -d, -f2)
+    secretfile=$(awk '{print $1","$2}' $openvpnconfig 2>/dev/null | cut -d'#' -f1 | grep -iE "^secret," | cut -d, -f2)
     [ "$secretfile" ] && [ -f $secretfile ] && [ $(stat -c %s $secretfile) -ge 300 ] && secreton="on"
     
     [ -f $openvpnsecret ] && secretfound="on"
@@ -277,7 +302,7 @@ load () {
     webinterfaces=$(ip -4 r | grep -oE "dev .{3,7} " | awk '!x[$2]++ {print $2}' | sort)
     gwlist='"int2dest":{"options":["'$(echo $webinterfaces | sed 's/ /","/g')'"],"other":"false"}'
 
-    
+
     #static-route?
     staticto=$(find /opt/vyatta/config/active/protocols/static/route/*/next-hop/$gw2dest -maxdepth 0 | awk -F"/" '{gsub("%2F","/",$9); print $9}')
     [ "$staticto" ] && staticon="on"
@@ -312,6 +337,7 @@ load () {
 
 # function called when you click apply
 apply () {
+    ret=0
     echo "Apply procedure..." >>$log
     updatefromgithub=$(jq -M -r '.updatefromgithub' $INPUT)
     if [[ "$updatefromgithub" == "on" ]]; then
@@ -466,14 +492,222 @@ jxxllu+yl3fX3XV3/ZuvPwAoGfqJAHAAAA==
     # end
     ####### wizard manual update from github
 
-    #reset/restart the tunnel
-    sudo /opt/vyatta/bin/sudo-users/vyatta-restart-ovpn.pl --vtun vtun0 >>$log 2>>$log
+    #reset daemon on user request
+    resetopenvpnnow=$(jq -M -r '.resetopenvpnnow' $INPUT)
+    if [ "$resetopenvpnnow" == "on" ]; then
+        resetdaemon=1
+    fi
+
+    #check for .secret
+    secretfile=$(awk '{print $1","$2}' $openvpnconfig 2>/dev/null | cut -d'#' -f1 | grep -iE "^secret," | cut -d, -f2)
+    [ "$secretfile" ] && [ -f $secretfile ] && [ $(stat -c %s $secretfile) -ge 300 ] && secreton="on"
+    secretonnew=$(jq -M -r '.secreton' $INPUT)
     
+    #IMPROVE this regarding filename handling of secret-file
+    if [ ! "$secreton" ] && [ "$secretonnew" == "on" ] && [ -f $openvpnsecret ] && [ $(stat -c %s $openvpnsecret) -ge 300 ]; then
+        echo "Setting up secret file in ovpn config" >>$log
+        #be careful with secret param
+        sed -i "/^.*#.*secret /"'s/^.*#.*secret.*$/secret \/config\/user-data\/funkfeuer\.secret/' $openvpnconfig
+        (grep -q "secret /config/user-data/funkfeuer.secret" $openvpnconfig) || echo "secret /config/user-data/funkfeuer.secret" >>$openvpnconfig
+        #now auth and cipher
+        sed -i "/^.*auth /"'s/^.*auth.*$/auth SHA256/' $openvpnconfig
+        (grep -q "auth SHA256" $openvpnconfig) || echo "auth SHA256" >>$openvpnconfig
+        sed -i "/^.*cipher /"'s/^.*cipher.*$/cipher none/' $openvpnconfig
+        (grep -q "cipher none" $openvpnconfig) || echo "cipher none" >>$openvpnconfig
+        resetdaemon=4
+    elif [ "$secreton" ] && [ ! "$secretonnew" ]; then
+        echo "Disable secret file in ovpn config" >>$log
+        sed -i "/^secret /"'s/^/#/' $openvpnconfig
+        sed -i "/^auth /"'s/^/#/' $openvpnconfig
+        sed -i "/^cipher /"'s/^/#/' $openvpnconfig
+        resetdaemon=5
+    fi
+
+    #get tunneldevice from config file
+    tunneldevice=$(awk '{print $1","$2}' $openvpnconfig 2>/dev/null | cut -d'#' -f1 | grep -iE "^dev," | cut -d, -f2)
+    
+    ##only if not updating right now
+    if [[ "$updatefromgithub" == "on" ]]; then
+        resetdaemon=""
+    else
+        #be sure there is a config file before doing anything
+        if [ ! -f $openvpnconfig ]; then
+            ret=1
+            output='missing config file - reinstall this wizard to fix it!'
+        else
+            #be sure the config file from a running process is matching the tunneldevice running it
+            if [[ "$tunneldevice" =~ vtun[0-9]{1,2} ]]; then
+                currentvtunprocess=$(ps aux | grep -v grep | grep -E "/usr/sbin/openvpn .* /var/run/openvpn-$tunneldevice.pid .*" | awk '{print $2}')
+                if [ "$currentvtunprocess" ]; then
+                    currentvtunconfig=$(ps $currentvtunprocess | tail -1 | grep -oE "\-\-config [A-Za-z0-9~!#$%^&*()_+-/]* " | awk '{print $2}')
+                else
+                    currentvtunconfig=$openvpnconfig
+                fi
+                if [ "$currentvtunconfig" == "$openvpnconfig" ]; then
+                    runningok=1
+                else
+                    ret=1
+                    output='openvpn@'$tunneldevice' using '$currentvtunconfig' - fix this manually before using this wizard!'
+                fi
+            else
+                ret=1
+                output='err: wrong or missing dev parameter in config file '$tunneldevice
+            fi
+        fi
+    fi
+    # end "if not updating"
+
+    #get bridges
+    bridge=$(cat /opt/vyatta/config/active/interfaces/openvpn/$tunneldevice/bridge-group/bridge/node.val 2>/dev/null)
+    bridgenew=$(jq -M -r '.bridge' $INPUT)
+
+    #prepare work for static route
+    destination=$(awk '{print $1","$2}' $openvpnconfig 2>/dev/null | cut -d'#' -f1 | grep -iE "^remote," | cut -d, -f2)
+    todestination=$(ip -4 r get $destination 2>/dev/null | head -1 | awk '{print $5","$3","$7}')
+    int2dest=$(echo $todestination | cut -d"," -f1)
+    gw2dest=$(echo $todestination | cut -d"," -f2)
+    int2destnew=$(jq -M -r '.int2dest' $INPUT)
+    
+    #avoid gateway to be the opebvpn bridge
+    [ "$int2destnew" ] && [ "$bridgenew" ] && [ "$int2destnew" == "$bridgenew" ] && int2destnew=$int2dest
+    
+    if [ "$int2dest" ] && [ "$int2destnew" ] && [ ! "$int2dest" == "$int2destnew" ]; then
+        #user wants to change default interface for vpn-destination
+        gw2destnew=$(ip -4 r | grep "dev $int2destnew " | grep "default via " | awk '{print $3}')
+        staticsaved=$(find /opt/vyatta/config/active/protocols/static/route/$destination%2F32/next-hop/$gw2dest -maxdepth 0 | awk -F"/" '{print $11}')
+        if [ "$staticsaved" ] && [ "$destination" ]; then
+            echo "Removing statuc route $destination/32 via gw=$staticsaved" >>$log
+            commandlist[${#commandlist[@]}]="delete protocols static route $destination/32"
+        fi
+        if [ "$gw2destnew" ] && [ "$destination" ]; then
+            echo "Adding static route $destination/32 via new gw=$gw2destnew" >>$log
+            commandlist[${#commandlist[@]}]="set protocols static route $destination/32 next-hop $gw2destnew description TunnelserverVPN"
+        fi
+    fi
+    
+
+    #get portnumber from config file
+    portnumber=$(awk '{print $1","$2}' $openvpnconfig 2>/dev/null | cut -d'#' -f1 | grep -iE "^port," | cut -d, -f2)
+    #get port number from user
+    portnumbernew=$(jq -M -r '.portnumber' $INPUT)
+    if [ "$portnumber" ] && [ "$portnumbernew" ] &&
+       [[ $portnumber =~ $re ]] && [[ $portnumbernew =~ $re ]] && 
+       [ $portnumbernew -ge 5000 ] && [ $portnumbernew -le 5999 ]; then
+        if [ ! "$portnumber" == "$portnumbernew" ]; then
+            #number is ok, change it
+            echo "Changing Portnumber from $portnumber to $portnumbernew" >>$log
+            linenumber=$(grep -niE "port.*$portnumber" $openvpnconfig | grep -viE ".*#.*port" | awk -F: {'print $1'})
+            sed -i "$linenumber""s/$portnumber/$portnumbernew/" $openvpnconfig 2>/dev/null
+            resetdaemon=2
+        fi
+    else
+        ret=1
+        output='portnumber error'
+    fi
+    
+    #extract openvpn-settings
+    #sed -n "/^    openvpn $tunneldevice {$/,/^    }$/p" /config/config.boot
+    
+    #check bridge settings ## go for "old" tunneldevice!
+    #get enabled state 
+    tunnelenabled=$(jq -M -r '.tunnelenabled' $INPUT)
+    tunneldevicenew=$(jq -M -r '.tunneldevice' $INPUT)
+    if [ ! "$tunneldevicenew" ] || [[ ! "$tunneldevicenew" =~ vtun[0-9]{1,2} ]]; then
+        ret=1
+        output="error on tunneldevice - must be between vtun0..vtun99"
+        tunneldevicenew="$tunneldevice"
+    fi
+    [ "$tunneldevicenew" ] && [ ! "$tunneldevice" == "$tunneldevicenew" ] && devchanged=1
+    
+    [ $(sed -n "/^    openvpn $tunneldevice {$/,/^    }$/p" /config/config.boot | grep -cE "^        disable$") -eq 1 ] && disabled="on"
+    [ $(sed -n "/^    openvpn $tunneldevice {$/,/^    }$/p" /config/config.boot | grep -c "config-file $openvpnconfig") -eq 1 ] && configured="on"
+    
+    if [ "$devchanged" ]; then
+        #put new dev to config file!
+        echo "Changing Tunneldevice from $tunneldevice to $tunneldevicenew" >>$log
+        linenumber=$(grep -niE "dev.*$tunneldevice" $openvpnconfig | grep -viE ".*#.*dev" | awk -F: {'print $1'})
+        sed -i "$linenumber""s/$tunneldevice/$tunneldevicenew/" $openvpnconfig 2>/dev/null
+        if [ "$configured" ]; then
+            # remove settings from old tunneldevice at first place
+            configured=""
+            disabled=""
+            bridge=""
+            resetdaemon=""
+            commandlist[${#commandlist[@]}]="delete interfaces openvpn $tunneldevice"
+            commandlist[${#commandlist[@]}]="commit"
+        fi
+    fi
+    
+    if [ "$tunnelenabled" == "on" ]; then
+        if [ "$configured" ]; then
+            [ "$disabled" ] && commandlist[${#commandlist[@]}]="delete interfaces openvpn $tunneldevice disable"
+        else 
+            commandlist[${#commandlist[@]}]="set interfaces openvpn $tunneldevicenew config-file $openvpnconfig"
+            commandlist[${#commandlist[@]}]="set interfaces openvpn $tunneldevicenew description Tunnelserver"
+        fi
+    elif [ "$configured" ]; then
+        [ "$disabled" ] || commandlist[${#commandlist[@]}]="set interfaces openvpn $tunneldevicenew disable"
+        disabled="on"
+        resetdaemon=""
+    else
+        commandlist[${#commandlist[@]}]="set interfaces openvpn $tunneldevicenew config-file $openvpnconfig"
+        commandlist[${#commandlist[@]}]="set interfaces openvpn $tunneldevicenew description Tunnelserver"
+        commandlist[${#commandlist[@]}]="set interfaces openvpn $tunneldevicenew disable"
+    fi
+
+    #now care about correct bridge
+    if [ "$bridge" == "$bridgenew" ]; then
+        [ "$devchanged" ] && [ "$bridgenew" ] && commandlist[${#commandlist[@]}]="set interfaces openvpn $tunneldevicenew bridge-group bridge $bridgenew"
+    elif [ "$bridgenew" ]; then
+        commandlist[${#commandlist[@]}]="set interfaces openvpn $tunneldevicenew bridge-group bridge $bridgenew"
+    fi
+
+    if [ ${#commandlist[@]} \> 0 ] && [ $ret == 0 ]; then
+        echo "Applying script commands..." >>$log
+        cmd="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
+tfile=$(mktemp)
+(
+$cmd begin
+ret=0
+for executecmd in "${commandlist[@]}"; do
+    if [ $ret == 0 ]; then
+        echo "--"$executecmd >>$log
+        $cmd $executecmd || ret=1
+    else
+        echo "--skipped: "$executecmd >>$log
+    fi
+done
+[ $ret == 0 ] && $cmd commit || ret=1
+[ $ret == 0 ] && $cmd save || ret=1
+$cmd end
+exit $ret
+) >$tfile 2>&1
+ret=$?
+output=$(cat $tfile)
+rm -f $tfile
+echo "${output}" >> $log
+    #exiting configuration all must be fine
+    fi
+
+    #reset daemon if requested from user or needed due to changes config file
+    if [ "$resetdaemon" ] && [ "$runningok" ] && [ "$currentvtunprocess" ]; then
+        startcommand=$(ps u --pid $currentvtunprocess | tail -1 | sed -e "s/^.*\/usr\/sbin\/openvpn /\/usr\/sbin\/openvpn /")
+        if [ "$startcommand" ]; then
+            echo "Resetting openvpn $tunneldevice pid $currentvtunprocess ($resetdaemon)..."  >>$log
+            sudo kill $currentvtunprocess >>$log 2>>$log
+            sudo rm -f /var/run/openvpn-vtun0.pid >>$log 2>>$log
+            sudo $startcommand
+        else
+            echo "Resetting openvpn failed - process not found"  >>$log
+        fi
+    fi
+
     # for debugging purposes
     cp $INPUT /tmp/result.json
 
     # $ret and $output comes from port change
     if [ "$ret" == "1" ]; then
+        echo "ERROR from Wizard to UI: "$output  >>$log
         echo "{\"success\":\"0\",\"error\": \"${output//\"/\'}\"}"
     else
         echo "{\"success\":\"1\"}"
@@ -482,9 +716,12 @@ jxxllu+yl3fX3XV3/ZuvPwAoGfqJAHAAAA==
 
 #ubnt@wehrtest-router:/var/log$ sudo cat /tmp/result.json
 #{
-#    "enabled": "on",
+#    "tunnelenabled": "on",
 #    "bridge": "br9",
-#    "portnumber": "5101"
+#    "portnumber": "5101",
+#    "tunneldevice": "vtun0",
+#    "secretstring": "",
+#    "int2dest": "eth0.1"
 #}
 #ubnt@wehrtest-router:/var/log$ sudo cat /tmp/result.json
 #{
