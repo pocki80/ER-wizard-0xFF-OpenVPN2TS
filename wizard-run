@@ -16,7 +16,7 @@ INPUT=$2
 cfgusrdir="/config/user-data/"
 log="/var/log/0xffopenvpn.log"
 
-tunnelserverip="78.41.115.228"
+tunnelserverip="78.41.115.16"
 tunneldevice="vtun0"
 openvpnconfig="/config/user-data/funkfeuer.ovpn"
 openvpnsecret="/config/user-data/funkfeuer.secret"
