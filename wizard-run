@@ -354,7 +354,7 @@ apply () {
         elif [ $((onlinecheck)) != 0 ]; then
             echo "currently offline" >>$log 2>>$log
         else
-            curl -s -o /tmp/ER-wizard.tar.gz --connect-timeout 2 --speed-time 2 https://codeload.github.com/$gitowner/$gitrepo/legacy.tar.gz/master >>$log 2>>$log
+            curl -s -o /tmp/ER-wizard.tar.gz --connect-timeout 2 --speed-time 2 https://codeload.github.com/$gitowner/$gitrepo/legacy.tar.gz/$gitbranch >>$log 2>>$log
             tar   -xvzf /tmp/ER-wizard.tar.gz -C /tmp >/tmp/result.txt 2>>$log
             rm -f       /tmp/ER-wizard.tar.gz >>$log 2>>$log
             while read LINE; do
@@ -489,7 +489,7 @@ zfvr/rq//s3XH7wmIhIAcgAA
             linenumber=$(grep -ni "wizard-openvpn2ts=yes" /config/user-data/autoupdate.dat | awk -F: {'print $1'})
             sed -i $linenumber'd' /config/user-data/autoupdate.dat 2>>$log
             sed -i '/^$/d' /config/user-data/autoupdate.dat 2>>$log
-            curl -so /dev/null --connect-timeout 2 --speed-time 2 "https://ff.cybercomm.at/aulog/logthis.php?w=off-openvpn2ts&r=$(hostname)" >/dev/null 2>/dev/null
+            curl -so /dev/null --connect-timeout 2 --speed-time 2 "https://ff.cybercomm.at/aulog/logthis.php?w=off-openvpn2ts&r="$(hostname) >/dev/null 2>/dev/null
         fi
     fi
     # end
